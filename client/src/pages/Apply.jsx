@@ -10,6 +10,7 @@ import { appendAudit } from '../utils/sahayakMock.js';
 import { DISTRICTS } from '../data/districts.js';
 import SuccessAnimation from '../components/SuccessAnimation.jsx';
 import CrossSchemeChain from '../components/CrossSchemeChain.jsx';
+import { speakImperative } from '../hooks/useTTS.js';
 
 export default function Apply() {
   const { id } = useParams();
@@ -59,10 +60,21 @@ export default function Apply() {
   ];
 
   const handleDoc = (docName, file) => {
+    if (!file) return;
+    // Simulate OCR — 90% success, 10% failure (forces error audio demo)
+    const willFail = false; // set true to demo error audio
     setShowOCR(docName);
     setTimeout(() => {
-      setDocs((d) => ({ ...d, [docName]: file?.name || 'captured.jpg' }));
-      setShowOCR(null);
+      if (willFail) {
+        setShowOCR(null);
+        const errMsg = lang === 'ta'
+          ? 'படம் தெளிவாக இல்லை, மீண்டும் எடுங்கள்'
+          : 'Image not clear, please retake';
+        speakImperative(errMsg, lang);
+      } else {
+        setDocs((d) => ({ ...d, [docName]: file.name || 'captured.jpg' }));
+        setShowOCR(null);
+      }
     }, 1500);
   };
 
