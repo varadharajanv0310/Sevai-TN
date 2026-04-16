@@ -6,6 +6,8 @@ import { DISTRICTS } from '../data/districts.js';
 import { t } from '../data/strings.js';
 import { getAuditLog } from '../utils/sahayakMock.js';
 import SahayakMode from '../components/SahayakMode.jsx';
+import { triggerDemoNotification } from '../utils/alertEngine.js';
+import { SCHEMES } from '../data/schemes.js';
 
 const EDITABLE_FIELDS = [
   { key: 'name', type: 'text', labelTa: 'பெயர்', labelEn: 'Name' },
@@ -159,6 +161,92 @@ export default function Profile() {
             </AnimatePresence>
           </div>
         )}
+
+        {/* Alert Settings */}
+        <div className="card space-y-4">
+          <div className="font-bold text-base flex items-center gap-2">
+            <span>🔔</span>
+            <span>{lang === 'ta' ? 'எச்சரிக்கை அமைப்புகள்' : 'Alert Settings'}</span>
+          </div>
+
+          {/* Category toggles */}
+          <div>
+            <div className="text-xs text-brand-muted uppercase tracking-wide mb-2">
+              {lang === 'ta' ? 'வகைகள்' : 'Categories'}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                ['farming','🌾',{en:'Farming',ta:'விவசாயம்'}],
+                ['education','📚',{en:'Education',ta:'கல்வி'}],
+                ['health','🏥',{en:'Health',ta:'சுகாதாரம்'}],
+                ['housing','🏠',{en:'Housing',ta:'வீட்டுவசதி'}],
+                ['women','👩',{en:'Women',ta:'மகளிர்'}],
+                ['employment','💼',{en:'Employment',ta:'வேலைவாய்ப்பு'}],
+                ['business','🏪',{en:'Business',ta:'வணிகம்'}],
+                ['elderly','🧓',{en:'Elderly',ta:'முதியோர்'}],
+              ].map(([cat, icon, label]) => {
+                const cats = vault.alert_categories ?? {};
+                const enabled = cats[cat] !== false; // default ON
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setVault({ alert_categories: { ...cats, [cat]: !enabled } })}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-sm font-medium transition-colors !min-h-0 text-left ${
+                      enabled ? 'border-brand-green bg-brand-green/8 text-brand-ink' : 'border-gray-200 text-brand-muted'
+                    }`}
+                  >
+                    <span>{icon}</span>
+                    <span>{lang === 'ta' ? label.ta : label.en}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Deadline window selector */}
+          <div>
+            <div className="text-xs text-brand-muted uppercase tracking-wide mb-2">
+              {lang === 'ta' ? 'எத்தனை நாட்களில் எச்சரிக்கை?' : 'Alert me when deadline is within'}
+            </div>
+            <div className="flex gap-2">
+              {[3, 7, 14].map((days) => (
+                <button
+                  key={days}
+                  onClick={() => setVault({ alert_deadline_days: days })}
+                  className={`flex-1 py-2 rounded-xl border-2 text-sm font-bold transition-colors !min-h-0 ${
+                    (vault.alert_deadline_days ?? 7) === days
+                      ? 'border-brand-green bg-brand-green text-white'
+                      : 'border-gray-200 text-brand-muted'
+                  }`}
+                >
+                  {days} {lang === 'ta' ? 'நாள்' : 'days'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* FOR DEMO: Trigger push notification */}
+        <div className="card border-2 border-dashed border-brand-saffron/50 bg-brand-saffron/5">
+          <div className="text-xs font-bold text-brand-saffron-dark uppercase tracking-widest mb-2">
+            ⚡ FOR DEMO
+          </div>
+          <p className="text-xs text-brand-muted mb-3">
+            {lang === 'ta'
+              ? 'புதிய திட்டம் வந்தது போல் push notification அனுப்புகிறது — app minimize செய்தும் வரும்'
+              : 'Simulates a new matching scheme push notification — fires even when app is minimized'}
+          </p>
+          <button
+            onClick={async () => {
+              const demoScheme = SCHEMES.find(s => s.benefit_amount > 0) || SCHEMES[0];
+              const fired = await triggerDemoNotification(demoScheme, lang);
+              if (!fired) alert(lang === 'ta' ? 'Notification அனுமதி தேவை — browser settings-ல் அனுமதிக்கவும்' : 'Please allow notifications in browser settings first');
+            }}
+            className="w-full bg-brand-saffron text-white font-bold rounded-xl py-3 text-sm"
+          >
+            🔔 {lang === 'ta' ? 'Demo Alert அனுப்பு' : 'Trigger Demo Alert'}
+          </button>
+        </div>
 
         {/* Sahayak login */}
         <button

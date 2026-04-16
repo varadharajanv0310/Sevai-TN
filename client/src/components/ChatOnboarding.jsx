@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { t } from '../data/strings.js';
 import { DISTRICTS } from '../data/districts.js';
 import { useTTS } from '../hooks/useTTS.js';
+import { useVoiceTranscript } from '../hooks/useVoiceTranscript.js';
 import { createRecorder } from '../utils/speechUtils.js';
 import { ageBandToNumber, incomeBandToMax, occupationKey } from '../utils/formatters.js';
 
@@ -32,6 +33,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
   const recorderRef = useRef(null);
 
   const { speak, stop } = useTTS();
+  const voiceTx = useVoiceTranscript(); // live Web Speech API transcript
   const step = STEPS[stepIdx];
 
   // Send bot prompt for current step — speak it via ElevenLabs
@@ -84,6 +86,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
       try {
         await rec.start();
         setRecording(true);
+        voiceTx.start(lang); // start live transcript alongside MediaRecorder
       } catch {
         setMessages((m) => [
           ...m,
@@ -94,6 +97,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
       const blob = await rec.stop();
       setRecording(false);
       if (!blob) return;
+      voiceTx.stop(); // stop live transcript
       setTranscribing(true);
       try {
         const fd = new FormData();
@@ -105,7 +109,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
         const data = await res.json();
         setTranscribing(false);
         if (data?.field && data?.value != null) {
-          setPendingAnswer({ field: data.field, value: data.value, text: String(data.value), confidence: data.confidence });
+          setPendingAnswer({ field: data.field, value: data.value, text: String(data.value), confidence: data.confidence, heard: voiceTx.transcript });
         } else {
           setMessages((m) => [
             ...m,
@@ -299,7 +303,14 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
             <div className="text-sm text-brand-muted mb-1">
               {lang === 'ta' ? 'நான் கேட்டது:' : 'I heard:'}
             </div>
-            <div className="text-lg font-semibold mb-3">{pendingAnswer.text}</div>
+            {pendingAnswer.heard && (
+              <div className="text-xs text-brand-muted mb-1 bg-gray-50 rounded-lg px-3 py-1.5">
+                🎤 &ldquo;{pendingAnswer.heard}&rdquo;
+              </div>
+            )}
+            <div className="text-lg font-semibold mb-3">
+              <TypewriterText text={String(pendingAnswer.text)} speed={80} />
+            </div>
             <div className="flex gap-2">
               <button onClick={confirmPending} className="btn-primary flex-1">{lang === 'ta' ? 'சரி' : 'Yes'}</button>
               <button onClick={rejectPending} className="btn-secondary flex-1">{lang === 'ta' ? 'மீண்டும்' : 'Retry'}</button>
@@ -310,10 +321,19 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
 
       {/* Options tray */}
       <div className="bg-white/10 backdrop-blur p-3 pb-5">
-        {transcribing && (
-          <div className="text-center text-sm opacity-90 mb-2">
-            {lang === 'ta' ? 'கேட்கிறேன்...' : 'Listening...'}
-          </div>
+        {(recording || transcribing) && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white/20 rounded-2xl px-4 py-3 text-sm text-white mb-2 min-h-[2.5rem] flex items-center gap-2"
+          >
+            <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse shrink-0" />
+            <span className="flex-1">
+              {transcribing
+                ? (lang === 'ta' ? 'கேட்கிறேன்...' : 'Processing...')
+                : (voiceTx.transcript || (lang === 'ta' ? 'பேசுங்கள்...' : 'Listening...'))}
+            </span>
+          </motion.div>
         )}
         <div className="bg-white rounded-2xl p-3 text-brand-ink">{options}</div>
         <div className="flex justify-center mt-3">
@@ -331,6 +351,29 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function TypewriterText({ text, speed = 60 }) {
+  const [displayed, setDisplayed] = useState('');
+  useEffect(() => {
+    setDisplayed('');
+    if (!text) return;
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) clearInterval(id);
+    }, speed);
+    return () => clearInterval(id);
+  }, [text, speed]);
+  return (
+    <span>
+      {displayed}
+      {displayed.length < (text?.length || 0) && (
+        <span className="animate-pulse opacity-70">|</span>
+      )}
+    </span>
   );
 }
 

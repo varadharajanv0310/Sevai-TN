@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useVault } from '../hooks/useVault.js';
 import { useEligibility } from '../hooks/useEligibility.js';
@@ -8,6 +8,8 @@ import FuzzyMatchCard from '../components/FuzzyMatchCard.jsx';
 import { t } from '../data/strings.js';
 import { formatRupees } from '../utils/formatters.js';
 import { DISTRICTS } from '../data/districts.js';
+import { getRelevantAlerts, requestNotificationPermission } from '../utils/alertEngine.js';
+import { SCHEMES } from '../data/schemes.js';
 
 // Category display labels (en + ta)
 const CATEGORY_LABELS = {
@@ -28,16 +30,33 @@ const CATEGORY_ICONS = {
   disability: '♿',
 };
 
-export default function Feed() {
+export default function Feed({ onAlertsChange }) {
   const { vault } = useVault();
   const { lang, setLang } = useLanguage();
   const { confirmed, fuzzy, totalEstimatedValue, topCategory } = useEligibility(vault);
   const [loading, setLoading] = useState(true);
 
+  const [alerts, setAlerts] = useState([]);
+  const [alertDismissed, setAlertDismissed] = useState(false);
+  const schemeRefs = useRef({}); // { [schemeId]: ref }
+
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 500);
     return () => clearTimeout(timer);
   }, []);
+
+  // Run alert engine after vault loads
+  useEffect(() => {
+    if (!vault || loading) return;
+    const lastChecked = new Date(vault.alerts_last_checked || 0);
+    const found = getRelevantAlerts(SCHEMES, vault, lastChecked);
+    setAlerts(found);
+    onAlertsChange?.(found.length);
+    // Request notification permission with explanation
+    if (found.length > 0) {
+      requestNotificationPermission();
+    }
+  }, [loading, vault]);
 
   const districtLabel = DISTRICTS.find((d) => d.id === vault.district);
   const districtStr = districtLabel ? (lang === 'ta' ? districtLabel.ta : districtLabel.en) : '';
@@ -103,6 +122,43 @@ export default function Feed() {
         )}
       </header>
 
+      {/* Dismissable alert banner */}
+      {alerts.length > 0 && !alertDismissed && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mx-4 mt-3 bg-brand-amber/15 border border-brand-amber rounded-2xl px-4 py-3 flex items-center gap-3"
+        >
+          <span className="text-xl">⚠️</span>
+          <div className="flex-1 text-sm text-brand-ink">
+            <span className="font-bold">
+              {lang === 'ta'
+                ? `${alerts.length} திட்டங்கள் இந்த வாரம் காலாவதியாகும்`
+                : `${alerts.length} scheme${alerts.length > 1 ? 's' : ''} expiring this week`}
+            </span>
+            {' — '}
+            <button
+              className="underline !min-h-0 !min-w-0 text-brand-green font-semibold"
+              onClick={() => {
+                // Scroll to the first alerted scheme card
+                const firstId = alerts[0]?.scheme?.id;
+                if (firstId && schemeRefs.current[firstId]) {
+                  schemeRefs.current[firstId].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+              }}
+            >
+              {lang === 'ta' ? 'காண்க' : 'tap to see'}
+            </button>
+          </div>
+          <button
+            className="!min-h-0 !min-w-0 text-brand-muted text-lg"
+            onClick={() => { setAlertDismissed(true); onAlertsChange?.(0); }}
+          >
+            ✕
+          </button>
+        </motion.div>
+      )}
+
       {/* Loading shimmer */}
       {loading ? (
         <div className="px-5 py-10 text-center">
@@ -134,11 +190,18 @@ export default function Feed() {
             {confirmed.map(({ scheme, score }, idx) => (
               <motion.div
                 key={scheme.id}
+                ref={el => { schemeRefs.current[scheme.id] = el; }}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05, duration: 0.3 }}
               >
-                <SchemeCard scheme={scheme} vault={vault} lang={lang} score={score} />
+                <SchemeCard
+                  scheme={scheme}
+                  vault={vault}
+                  lang={lang}
+                  score={score}
+                  highlight={alerts.some(a => a.scheme?.id === scheme.id)}
+                />
               </motion.div>
             ))}
           </section>
