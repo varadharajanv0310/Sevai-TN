@@ -27,7 +27,7 @@ function Shell() {
   const [phase, setPhase] = useState('loading'); // loading | onboarding | reveal | app
   const loc = useLocation();
   const nav = useNavigate();
-  const { eligible, totalValue } = useEligibility(vault);
+  const { eligible, totalEstimatedValue } = useEligibility(vault);
 
   useEffect(() => {
     if (!ready) return;
@@ -71,7 +71,7 @@ function Shell() {
   if (phase === 'reveal') {
     return (
       <AnimatePresence>
-        <WowReveal count={eligible.length} totalValue={totalValue} lang={lang} onContinue={goFeed} />
+        <WowReveal count={eligible.length} totalValue={totalEstimatedValue} lang={lang} onContinue={goFeed} />
       </AnimatePresence>
     );
   }

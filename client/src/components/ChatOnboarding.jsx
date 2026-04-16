@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { t } from '../data/strings.js';
 import { DISTRICTS } from '../data/districts.js';
-import { speak, stopSpeaking, createRecorder } from '../utils/speechUtils.js';
+import { useTTS } from '../hooks/useTTS.js';
+import { createRecorder } from '../utils/speechUtils.js';
 import { ageBandToNumber, incomeBandToMax, occupationKey } from '../utils/formatters.js';
 
-// WhatsApp-style chat onboarding. Bot asks questions one at a time, large options below.
+// WhatsApp-style chat onboarding. Bot speaks every message via ElevenLabs.
 
 const STEPS = [
   { key: 'language', prompt: 'bot_greet' },
@@ -27,13 +28,13 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
   const [typing, setTyping] = useState(false);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
-  const [confirmed, setConfirmed] = useState(null); // {field, value, text}
   const scrollRef = useRef(null);
   const recorderRef = useRef(null);
 
+  const { speak, stop } = useTTS();
   const step = STEPS[stepIdx];
 
-  // Send bot prompt for the current step
+  // Send bot prompt for current step — speak it via ElevenLabs
   useEffect(() => {
     if (!step) return;
     setTyping(true);
@@ -45,12 +46,12 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
     }, BUBBLE_DELAY);
     return () => {
       clearTimeout(timer);
-      stopSpeaking();
+      stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepIdx, lang]);
 
-  // Auto-scroll to latest message
+  // Auto-scroll
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 9e9, behavior: 'smooth' });
   }, [messages, typing]);
@@ -58,6 +59,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
   const pushUser = (text) => setMessages((m) => [...m, { from: 'user', text }]);
 
   const confirmAndAdvance = (field, value, text) => {
+    stop(); // cut bot audio when user taps an option
     pushUser(text);
     setAnswers((a) => ({ ...a, [field]: value }));
     setStepIdx((i) => i + 1);
@@ -67,32 +69,14 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
     setLang(l);
     confirmAndAdvance('languages_preferred', [l], l === 'ta' ? 'தமிழ்' : 'English');
   };
+  const handleAgeChoice = (band, label) => confirmAndAdvance('age', ageBandToNumber(band), label);
+  const handleOccupationChoice = (occEn, label) => confirmAndAdvance('occupation', occupationKey(occEn), label);
+  const handleDistrictChoice = (d) => confirmAndAdvance('district', d.id, lang === 'ta' ? d.ta : d.en);
+  const handleIncomeChoice = (band, label) => confirmAndAdvance('annual_income', incomeBandToMax(band), label);
+  const handleCasteChoice = (c) => confirmAndAdvance('caste', c === 'prefer_not_say' ? null : c, c === 'prefer_not_say' ? t('prefer_not_say', lang) : c);
+  const handleGenderChoice = (isFemale, label) => confirmAndAdvance('gender', isFemale ? 'female' : 'male', label);
 
-  const handleAgeChoice = (band, label) => {
-    confirmAndAdvance('age', ageBandToNumber(band), label);
-  };
-
-  const handleOccupationChoice = (occEn, label) => {
-    confirmAndAdvance('occupation', occupationKey(occEn), label);
-  };
-
-  const handleDistrictChoice = (d) => {
-    confirmAndAdvance('district', d.id, lang === 'ta' ? d.ta : d.en);
-  };
-
-  const handleIncomeChoice = (band, label) => {
-    confirmAndAdvance('annual_income', incomeBandToMax(band), label);
-  };
-
-  const handleCasteChoice = (c) => {
-    confirmAndAdvance('caste', c === 'prefer_not_say' ? null : c, c === 'prefer_not_say' ? t('prefer_not_say', lang) : c);
-  };
-
-  const handleGenderChoice = (isFemale, label) => {
-    confirmAndAdvance('gender', isFemale ? 'female' : 'male', label);
-  };
-
-  // Voice recording → backend /api/extract-intent
+  // Voice recording → /api/extract-intent
   const toggleRecord = async () => {
     if (!recorderRef.current) recorderRef.current = createRecorder();
     const rec = recorderRef.current;
@@ -100,8 +84,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
       try {
         await rec.start();
         setRecording(true);
-      } catch (err) {
-        console.warn('mic permission', err);
+      } catch {
         setMessages((m) => [
           ...m,
           { from: 'system', text: lang === 'ta' ? 'மைக் அணுகல் மறுக்கப்பட்டது' : 'Microphone access denied' },
@@ -122,7 +105,6 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
         const data = await res.json();
         setTranscribing(false);
         if (data?.field && data?.value != null) {
-          // Show as a user message and wait for user confirmation before advancing
           setPendingAnswer({ field: data.field, value: data.value, text: String(data.value), confidence: data.confidence });
         } else {
           setMessages((m) => [
@@ -130,9 +112,8 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
             { from: 'system', text: lang === 'ta' ? 'புரிந்துகொள்ள முடியவில்லை. விருப்பத்தை தட்டுங்கள்.' : "Couldn't hear clearly. Please tap an option." },
           ]);
         }
-      } catch (err) {
+      } catch {
         setTranscribing(false);
-        console.warn('extract-intent failed', err);
       }
     }
   };
@@ -140,7 +121,6 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
   const confirmPending = () => {
     if (!pendingAnswer) return;
     const { field, value, text } = pendingAnswer;
-    // Heuristic mapping from extracted value → our enum/number
     let storedValue = value;
     if (step.key === 'age') storedValue = typeof value === 'number' ? value : parseInt(value, 10) || 30;
     if (step.key === 'annual_income') storedValue = typeof value === 'number' ? value : 100000;
@@ -150,7 +130,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
 
   const rejectPending = () => setPendingAnswer(null);
 
-  // When all steps done, fire final animation + onComplete
+  // All steps done → finishing message then call onComplete
   useEffect(() => {
     if (stepIdx === STEPS.length) {
       setTyping(true);
@@ -163,10 +143,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
       const done = setTimeout(() => {
         onComplete(answers);
       }, 2400);
-      return () => {
-        clearTimeout(timer);
-        clearTimeout(done);
-      };
+      return () => { clearTimeout(timer); clearTimeout(done); };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepIdx]);
@@ -193,9 +170,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
               ['41_60', t('age_41_60', lang)],
               ['60_plus', t('age_60_plus', lang)],
             ].map(([k, label]) => (
-              <ChatOpt key={k} onClick={() => handleAgeChoice(k, label)}>
-                {label}
-              </ChatOpt>
+              <ChatOpt key={k} onClick={() => handleAgeChoice(k, label)}>{label}</ChatOpt>
             ))}
           </div>
         );
@@ -230,9 +205,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
               ['2_5_5l', t('inc_2_5_5l', lang)],
               ['above_5l', t('inc_above_5l', lang)],
             ].map(([k, label]) => (
-              <ChatOpt key={k} onClick={() => handleIncomeChoice(k, label)}>
-                {label}
-              </ChatOpt>
+              <ChatOpt key={k} onClick={() => handleIncomeChoice(k, label)}>{label}</ChatOpt>
             ))}
           </div>
         );
@@ -253,8 +226,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
             <ChatOpt onClick={() => handleGenderChoice(false, t('no', lang))}>{t('no', lang)}</ChatOpt>
           </div>
         );
-      default:
-        return null;
+      default: return null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, lang, pendingAnswer]);
@@ -273,7 +245,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
           </div>
         </div>
         <button
-          onClick={() => setLang(lang === 'ta' ? 'en' : 'ta')}
+          onClick={() => { stop(); setLang(lang === 'ta' ? 'en' : 'ta'); }}
           className="text-sm underline underline-offset-2 !min-h-0 !min-w-0 px-2 py-1"
         >
           {t('switch_language', lang)}
@@ -305,11 +277,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
             </motion.div>
           ))}
           {typing && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex justify-start"
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
               <div className="bg-white text-brand-ink rounded-2xl rounded-bl-sm px-4 py-3 shadow">
                 <span className="inline-flex gap-1">
                   <span className="w-2 h-2 rounded-full bg-brand-muted animate-pulse" />
@@ -321,7 +289,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
           )}
         </AnimatePresence>
 
-        {/* Pending voice answer confirmation */}
+        {/* Voice answer confirmation */}
         {pendingAnswer && (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -333,12 +301,8 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
             </div>
             <div className="text-lg font-semibold mb-3">{pendingAnswer.text}</div>
             <div className="flex gap-2">
-              <button onClick={confirmPending} className="btn-primary flex-1">
-                {lang === 'ta' ? 'சரி' : 'Yes'}
-              </button>
-              <button onClick={rejectPending} className="btn-secondary flex-1">
-                {lang === 'ta' ? 'மீண்டும்' : 'Retry'}
-              </button>
+              <button onClick={confirmPending} className="btn-primary flex-1">{lang === 'ta' ? 'சரி' : 'Yes'}</button>
+              <button onClick={rejectPending} className="btn-secondary flex-1">{lang === 'ta' ? 'மீண்டும்' : 'Retry'}</button>
             </div>
           </motion.div>
         )}
@@ -351,11 +315,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
             {lang === 'ta' ? 'கேட்கிறேன்...' : 'Listening...'}
           </div>
         )}
-        <div className="bg-white rounded-2xl p-3 text-brand-ink">
-          {options}
-        </div>
-
-        {/* Mic */}
+        <div className="bg-white rounded-2xl p-3 text-brand-ink">{options}</div>
         <div className="flex justify-center mt-3">
           <button
             onClick={toggleRecord}

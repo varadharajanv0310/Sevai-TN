@@ -3,17 +3,19 @@ import express from 'express';
 import cors from 'cors';
 import intentExtraction from './routes/intentExtraction.js';
 import schemeSummarizer from './routes/schemeSummarizer.js';
+import tts from './routes/tts.js';
 import { getClaude, MODEL } from './middleware/claudeClient.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '2mb' }));
 
-// Mount both under /api
+// Mount all routes under /api
 app.use('/api', intentExtraction);
 app.use('/api', schemeSummarizer);
+app.use('/api', tts);
 
 // Health check — useful for demo day ("is Claude wired up?")
 app.get('/api/health', (_, res) => {
