@@ -4,6 +4,7 @@ import cors from 'cors';
 import intentExtraction from './routes/intentExtraction.js';
 import schemeSummarizer from './routes/schemeSummarizer.js';
 import tts from './routes/tts.js';
+import extractDocument from './routes/extractDocument.js';
 import { getClaude, MODEL } from './middleware/claudeClient.js';
 
 const app = express();
@@ -16,6 +17,7 @@ app.use(express.json({ limit: '2mb' }));
 app.use('/api', intentExtraction);
 app.use('/api', schemeSummarizer);
 app.use('/api', tts);
+app.use('/api', extractDocument);
 
 // Health check — useful for demo day ("is Claude wired up?")
 app.get('/api/health', (_, res) => {

@@ -146,6 +146,12 @@ export function fuzzyMatch(scheme, profile) {
   const e = scheme.eligibility || {};
   const age = profile.age ?? null;
 
+  // Hard block: gender mismatch is NEVER a fuzzy match.
+  // A female-only scheme must never appear as a "close match" for a male user.
+  if (e.gender && e.gender !== 'any' && profile.gender && e.gender !== profile.gender) {
+    return null;
+  }
+
   // Age within 24 months of min_age
   if (age !== null && e.min_age != null && age < e.min_age) {
     const ageDiff = e.min_age - age;

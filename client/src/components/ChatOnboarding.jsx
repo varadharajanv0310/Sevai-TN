@@ -98,6 +98,7 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
       setRecording(false);
       if (!blob) return;
       voiceTx.stop(); // stop live transcript
+      const capturedTranscript = voiceTx.transcript || voiceTx.finalTranscript || '';
       setTranscribing(true);
       try {
         const fd = new FormData();
@@ -105,11 +106,12 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
         fd.append('language', lang);
         fd.append('field', step.key);
         fd.append('question', t(step.prompt, lang));
+        fd.append('text', capturedTranscript); // send transcript so server can extract without STT service
         const res = await fetch('/api/extract-intent', { method: 'POST', body: fd });
         const data = await res.json();
         setTranscribing(false);
         if (data?.field && data?.value != null) {
-          setPendingAnswer({ field: data.field, value: data.value, text: String(data.value), confidence: data.confidence, heard: voiceTx.transcript });
+          setPendingAnswer({ field: data.field, value: data.value, text: String(data.value), confidence: data.confidence, heard: capturedTranscript });
         } else {
           setMessages((m) => [
             ...m,
