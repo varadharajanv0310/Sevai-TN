@@ -10,6 +10,7 @@ import { appendAudit } from '../utils/sahayakMock.js';
 import { DISTRICTS } from '../data/districts.js';
 import SuccessAnimation from '../components/SuccessAnimation.jsx';
 import CrossSchemeChain from '../components/CrossSchemeChain.jsx';
+import DocumentScanner from '../components/DocumentScanner.jsx';
 import { speakImperative } from '../hooks/useTTS.js';
 import { verifyDocument } from '../utils/documentVerifier.js';
 import { useVoiceTranscript } from '../hooks/useVoiceTranscript.js';
@@ -59,6 +60,7 @@ export default function Apply() {
   const [docs, setDocs] = useState({});
   const [docErrors, setDocErrors] = useState({}); // { [docName]: verifyResult }
   const [showOCR, setShowOCR] = useState(null);
+  const [activeScannerDoc, setActiveScannerDoc] = useState(null); // docName when camera is open
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showRelated, setShowRelated] = useState(false);
@@ -109,6 +111,29 @@ export default function Apply() {
       setDocs((d) => ({ ...d, [docName]: { name: file.name || 'captured.jpg', verified: true } }));
     }
   };
+
+  // ── Camera / DocumentScanner extraction ────────────────────────────────
+  const handleDocExtracted = useCallback((data, _base64Image) => {
+    const docName = activeScannerDoc;
+    setActiveScannerDoc(null);
+    if (!docName) return;
+
+    // Always mark the doc as scanned — camera capture counts as "done"
+    setDocs((d) => ({ ...d, [docName]: { name: 'scanned.jpg', verified: true } }));
+    // Clear any prior error for this doc
+    setDocErrors((e) => { const next = { ...e }; delete next[docName]; return next; });
+
+    // Auto-fill vault with extracted name / gender if not already set
+    if (data && !data.error) {
+      const updates = {};
+      if (data.name && !vault.name) updates.name = data.name;
+      if (data.gender && !vault.gender) {
+        const g = data.gender.toLowerCase();
+        if (g === 'male' || g === 'female' || g === 'other') updates.gender = g;
+      }
+      if (Object.keys(updates).length > 0) setVault(updates);
+    }
+  }, [activeScannerDoc, vault, setVault]);
 
   const allDocsDone = scheme.documents_required.every((d) => docs[d]);
 
@@ -339,6 +364,18 @@ export default function Apply() {
                       className="hidden"
                     />
                   </label>
+                  {/* Smart Scan button — opens live camera */}
+                  {!done && (
+                    <div className="mt-1.5">
+                      <button
+                        onClick={() => setActiveScannerDoc(d)}
+                        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-gradient-to-r from-brand-green to-brand-green-dark text-white text-xs font-semibold shadow active:scale-95 transition-transform"
+                      >
+                        <span>📸</span>
+                        <span>{lang === 'ta' ? 'ஸ்மார்ட் ஸ்கேன் — தானாக நிரப்பு' : 'Smart Scan — auto-fill'}</span>
+                      </button>
+                    </div>
+                  )}
                   {/* Retake button on error */}
                   {err && (
                     <motion.div
@@ -380,6 +417,41 @@ export default function Apply() {
           </p>
         )}
       </div>
+
+      {/* DocumentScanner modal — opens when Smart Scan tapped */}
+      <AnimatePresence>
+        {activeScannerDoc && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/70 flex flex-col justify-end"
+            onClick={() => setActiveScannerDoc(null)}
+          >
+            <motion.div
+              initial={{ y: 120 }}
+              animate={{ y: 0 }}
+              exit={{ y: 120 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 260 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-brand-bg rounded-t-3xl p-4 pb-8 max-w-lg mx-auto w-full"
+            >
+              <div className="w-10 h-1.5 bg-gray-300 rounded-full mx-auto mb-3" />
+              <div className="text-xs text-brand-muted text-center mb-3 font-medium">
+                {lang === 'ta'
+                  ? `"${activeScannerDoc}" — கேமராவில் காட்டுங்கள்`
+                  : `Scan your "${activeScannerDoc}"`}
+              </div>
+              <DocumentScanner
+                lang={lang}
+                autoOpen
+                onDataExtracted={handleDocExtracted}
+                onClose={() => setActiveScannerDoc(null)}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* OCR processing overlay */}
       <AnimatePresence>
