@@ -41,12 +41,20 @@ export default function StatusTimeline({ app, lang }) {
     ? tf('status_plain_rejected', lang, { name: scheme.name_plain, reason: app.reject_reason || (lang === 'ta' ? 'வருமான சான்றிதழ் இல்லை' : 'Income certificate missing') })
     : tf('status_plain_review', lang, { name: scheme.name_plain });
 
-  // Hindi/Tanglish SMS mock
+  // Mock SMS — Tamil or English depending on user's language
+  const shortName = scheme.name_plain.split(' ').slice(0, 4).join(' ');
+  const amt = scheme.benefit_amount ? `₹${scheme.benefit_amount.toLocaleString('en-IN')}` : '';
   const smsMock = isApproved
-    ? `Aapka ${scheme.name_plain.split(' ').slice(0, 3).join(' ')} aavedhan swikar ho gaya. ₹${scheme.benefit_amount.toLocaleString('en-IN')} aapke khate mein 7 dinon mein aayega.`
+    ? lang === 'ta'
+      ? `உங்கள் ${shortName} விண்ணப்பம் அங்கீகரிக்கப்பட்டது.${amt ? ` ${amt} 7 நாட்களில் உங்கள் கணக்கில் வரவு வைக்கப்படும்.` : ''}`
+      : `Your ${shortName} application is approved.${amt ? ` ${amt} will be credited to your account within 7 days.` : ''}`
     : isRejected
-    ? `Aapka ${scheme.name_plain.split(' ').slice(0, 3).join(' ')} aavedhan ke liye aur document chahiye. Kripya form phir se jama karein.`
-    : `Aapka ${scheme.name_plain.split(' ').slice(0, 3).join(' ')} aavedhan process mein hai. 5-7 din mein update milega.`;
+    ? lang === 'ta'
+      ? `உங்கள் ${shortName} விண்ணப்பத்திற்கு கூடுதல் ஆவணங்கள் தேவை. மீண்டும் சமர்ப்பிக்கவும்.`
+      : `Your ${shortName} application needs additional documents. Please resubmit with required docs.`
+    : lang === 'ta'
+    ? `உங்கள் ${shortName} விண்ணப்பம் செயலில் உள்ளது. 5-7 நாட்களில் அறிவிக்கப்படும்.`
+    : `Your ${shortName} application is under review. You will receive an update in 5-7 days.`;
 
   return (
     <motion.div

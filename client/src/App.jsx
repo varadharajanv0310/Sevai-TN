@@ -28,6 +28,7 @@ function Shell() {
   const loc = useLocation();
   const nav = useNavigate();
   const { eligible, totalEstimatedValue } = useEligibility(vault);
+  const [feedBadge, setFeedBadge] = useState(0);
 
   useEffect(() => {
     if (!ready) return;
@@ -84,7 +85,7 @@ function Shell() {
       <div className="flex-1 overflow-y-auto">
         <Routes>
           <Route path="/" element={<Navigate to="/feed" replace />} />
-          <Route path="/feed" element={<Feed />} />
+          <Route path="/feed" element={<Feed onAlertsChange={setFeedBadge} />} />
           <Route path="/applications" element={<Applications />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/scheme/:id" element={<SchemeDetail />} />
@@ -92,7 +93,7 @@ function Shell() {
           <Route path="*" element={<Navigate to="/feed" replace />} />
         </Routes>
       </div>
-      {showNav && <BottomNav lang={lang} />}
+      {showNav && <BottomNav lang={lang} feedBadge={feedBadge} />}
     </div>
   );
 }

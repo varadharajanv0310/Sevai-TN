@@ -1,0 +1,22 @@
+{
+  "name": "Sevai Scout — உங்கள் திட்ட துணை",
+  "short_name": "Sevai Scout",
+  "description": "Find Tamil Nadu government schemes you qualify for — in Tamil and English",
+  "theme_color": "#1B5E20",
+  "background_color": "#F5F5F0",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/",
+  "scope": "/",
+  "lang": "ta",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["government", "social", "utilities"],
+  "screenshots": []
+}

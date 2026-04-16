@@ -71,14 +71,11 @@ export const createRecorder = () => {
 };
 
 // ─── Legacy stubs (use useTTS hook instead) ──────────────────────────────────
-export const speak = async (text, lang = 'ta', { onEnd } = {}) => {
-  if (!('speechSynthesis' in window)) { onEnd?.(); return; }
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = lang === 'ta' ? 'ta-IN' : 'en-IN';
-  u.rate = 0.92;
-  u.onend = () => { onEnd?.(); };
-  window.speechSynthesis.speak(u);
+// Stub — ElevenLabs TTS is handled exclusively by the useTTS hook.
+// This shim exists so any legacy callers don't crash. It intentionally
+// does NOT call speechSynthesis — that would produce a second voice.
+export const speak = async (_text, _lang = 'ta', { onEnd } = {}) => {
+  onEnd?.();
 };
 
 export const stopSpeaking = () => {

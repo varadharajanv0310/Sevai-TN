@@ -7,9 +7,10 @@ import { t } from '../data/strings.js';
 
 export default function DeadlineVisualizer({ scheme, vault, lang }) {
   const days = daysUntil(scheme.deadline);
-  const clamped = Math.max(0, Math.min(60, days));
-  const pct = (60 - clamped) / 60; // fills left→right as deadline approaches
-  const color = deadlineColor(days);
+  const isOpen = !scheme.deadline || days === Infinity;
+  const clamped = isOpen ? 0 : Math.max(0, Math.min(60, days));
+  const pct = isOpen ? 0 : (60 - clamped) / 60;
+  const color = isOpen ? '#4CAF50' : deadlineColor(days);
   const [reminded, setReminded] = useState(hasReminder(scheme.id));
   const myDistrict = vault?.district;
   const districtCount = scheme.district_applicants?.[myDistrict] ?? 0;
@@ -26,9 +27,13 @@ export default function DeadlineVisualizer({ scheme, vault, lang }) {
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-baseline gap-1.5">
           <span className="text-xl font-black" style={{ color }}>
-            {Math.max(0, days)}
+            {isOpen ? '∞' : Math.max(0, days)}
           </span>
-          <span className="text-sm text-brand-muted">{t('days_left', lang)}</span>
+          <span className="text-sm text-brand-muted">
+            {isOpen
+              ? (lang === 'ta' ? 'காலக்கெடு இல்லை' : 'No time limit')
+              : t('days_left', lang)}
+          </span>
         </div>
         <button
           onClick={handleBell}
