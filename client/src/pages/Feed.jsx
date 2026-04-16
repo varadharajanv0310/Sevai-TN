@@ -11,7 +11,6 @@ import { DISTRICTS } from '../data/districts.js';
 import { getRelevantAlerts, requestNotificationPermission } from '../utils/alertEngine.js';
 import { SCHEMES } from '../data/schemes.js';
 
-// Category display labels (en + ta)
 const CATEGORY_LABELS = {
   farming:    { en: 'Farming',    ta: 'விவசாயம்'     },
   education:  { en: 'Education',  ta: 'கல்வி'         },
@@ -38,24 +37,20 @@ export default function Feed({ onAlertsChange }) {
 
   const [alerts, setAlerts] = useState([]);
   const [alertDismissed, setAlertDismissed] = useState(false);
-  const schemeRefs = useRef({}); // { [schemeId]: ref }
+  const schemeRefs = useRef({});
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 500);
     return () => clearTimeout(timer);
   }, []);
 
-  // Run alert engine after vault loads
   useEffect(() => {
     if (!vault || loading) return;
     const lastChecked = new Date(vault.alerts_last_checked || 0);
     const found = getRelevantAlerts(SCHEMES, vault, lastChecked);
     setAlerts(found);
     onAlertsChange?.(found.length);
-    // Request notification permission with explanation
-    if (found.length > 0) {
-      requestNotificationPermission();
-    }
+    if (found.length > 0) requestNotificationPermission();
   }, [loading, vault]);
 
   const districtLabel = DISTRICTS.find((d) => d.id === vault.district);
@@ -65,42 +60,40 @@ export default function Feed({ onAlertsChange }) {
   const catIcon  = CATEGORY_ICONS[topCategory] || '📋';
 
   return (
-    <div className="min-h-full pb-24 bg-brand-bg">
-      {/* Hero header */}
-      <header className="bg-brand-green text-white px-5 pt-6 pb-8 rounded-b-3xl shadow-md">
+    <div className="min-h-[100dvh] pb-24 bg-brand-white">
+      {/* Hero header — new white bento style */}
+      <header className="bg-white px-6 pt-8 pb-6 border-b border-gray-100 shadow-sm sticky top-0 z-40">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-xs opacity-80">{t('app_name', lang)}</div>
-            <div className="text-sm opacity-90">
+            <div className="text-xs font-bold text-brand-blue tracking-widest uppercase mb-1">{t('app_name', lang)}</div>
+            <div className="text-xl font-black tracking-tight text-brand-ink">
               {vault.name
-                ? lang === 'ta'
-                  ? `வணக்கம், ${vault.name}`
-                  : `Hello, ${vault.name}`
-                : lang === 'ta'
-                ? 'வணக்கம்'
-                : 'Hello'}
-              {districtStr && <span> · {districtStr}</span>}
+                ? lang === 'ta' ? `வணக்கம், ${vault.name}` : `Hello, ${vault.name}`
+                : lang === 'ta' ? 'வணக்கம்' : 'Hello'}
+              {districtStr && <span className="text-gray-400 font-medium"> · {districtStr}</span>}
             </div>
           </div>
           <button
             onClick={() => setLang(lang === 'ta' ? 'en' : 'ta')}
-            className="!min-h-0 !min-w-0 text-xs bg-white/15 rounded-full px-3 py-1.5"
+            className="text-xs font-bold bg-gray-100 text-brand-ink rounded-full px-4 py-2 hover:bg-gray-200 transition-colors"
           >
-            {lang === 'ta' ? 'EN' : 'த'}
+            {lang === 'ta' ? 'EN' : 'தமிழ்'}
           </button>
         </div>
 
-        {/* Count + value */}
-        <div className="mt-5">
-          <div className="text-xs opacity-80 uppercase tracking-widest">
-            {lang === 'ta' ? 'உங்களுக்கு தகுதியானவை' : 'You qualify for'}
+        {/* Bento counter widget */}
+        <div className="mt-6 flex bg-gray-50 rounded-[20px] p-5 items-center gap-5 border border-gray-100 shadow-sm">
+          <div className="w-16 h-16 bg-[#1A1A1A] text-white rounded-2xl flex items-center justify-center text-3xl font-black shadow-inner shadow-black/50">
+            {confirmed.length}
           </div>
-          <div className="flex items-baseline gap-3 mt-1">
-            <span className="text-5xl font-black text-brand-saffron">{confirmed.length}</span>
-            <span className="text-sm opacity-90">
-              {lang === 'ta' ? 'திட்டங்கள்' : 'schemes'} · {formatRupees(totalEstimatedValue)}
-              <span className="text-xs opacity-70">{t('wow_per_year', lang)}</span>
-            </span>
+          <div className="flex-1">
+            <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+              {lang === 'ta' ? 'திட்டங்கள் | மொத்தம்' : 'Schemes | Total Value'}
+            </div>
+            <div className="text-2xl font-black text-[#007AFF] tracking-tighter leading-none">
+              {formatRupees(totalEstimatedValue)}
+              <span className="text-[11px] text-gray-500 font-bold ml-1.5 tracking-wider uppercase">{t('wow_per_year', lang)}</span>
+            </div>
           </div>
         </div>
 
@@ -110,7 +103,7 @@ export default function Feed({ onAlertsChange }) {
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="mt-4 inline-flex items-center gap-2 bg-white/15 rounded-full px-4 py-1.5 text-xs"
+            className="mt-4 inline-flex items-center gap-2 bg-gray-100 rounded-full px-4 py-1.5 text-xs text-brand-ink"
           >
             <span>{catIcon}</span>
             <span>
@@ -140,7 +133,6 @@ export default function Feed({ onAlertsChange }) {
             <button
               className="underline !min-h-0 !min-w-0 text-brand-green font-semibold"
               onClick={() => {
-                // Scroll to the first alerted scheme card
                 const firstId = alerts[0]?.scheme?.id;
                 if (firstId && schemeRefs.current[firstId]) {
                   schemeRefs.current[firstId].scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -164,16 +156,16 @@ export default function Feed({ onAlertsChange }) {
         <div className="px-5 py-10 text-center">
           <div className="inline-flex items-center gap-3 text-brand-muted">
             <span className="inline-flex gap-1">
-              <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse" />
-              <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse [animation-delay:150ms]" />
-              <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse [animation-delay:300ms]" />
+              <span className="w-2 h-2 rounded-full bg-brand-blue animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-brand-blue animate-pulse [animation-delay:150ms]" />
+              <span className="w-2 h-2 rounded-full bg-brand-blue animate-pulse [animation-delay:300ms]" />
             </span>
             {t('loading_schemes', lang)}
           </div>
         </div>
       ) : (
         <>
-          {/* ── Confirmed schemes ── */}
+          {/* Confirmed schemes */}
           <section className="px-4 py-4 space-y-3">
             <h2 className="text-sm font-bold text-brand-muted uppercase tracking-wide px-1">
               {lang === 'ta' ? 'பரிந்துரைக்கப்பட்டவை' : 'Recommended for you'}
@@ -206,7 +198,7 @@ export default function Feed({ onAlertsChange }) {
             ))}
           </section>
 
-          {/* ── Fuzzy "You might also qualify" section ── */}
+          {/* Fuzzy "You might also qualify" section */}
           {fuzzy.length > 0 && (
             <section className="px-4 py-2 pb-4 space-y-3">
               <motion.div
